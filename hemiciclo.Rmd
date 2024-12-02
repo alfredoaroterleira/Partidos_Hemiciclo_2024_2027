@@ -1,0 +1,88 @@
+---
+title: "**Gráfico Hemiciclo: Cámara de Diputados México (2024-2027)**"
+author: "Alfredo Aro Terleira"
+output: html_document
+---
+
+## Paso 1: Importamos la data
+
+```{r}
+library(rio)
+d_2024 = import("diputados_2024.xlsx")
+```
+
+## Paso 2: Creamos los gráficos
+
+```{r}
+library(tidyverse)
+library(forcats)
+library(ggparliament)
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+```
+
+```{r}
+# Usamos la columna 'PARTIDO' para crear la columna de agrupación de partidos
+d_2024 %>%
+  mutate(party_groups = PARTIDO) -> mi_data_lump_count  
+
+# Contamos la cantidad de diputados por partido
+mi_data_lump_count %>%
+  group_by(party_groups) %>%
+  summarise(n = sum(DIPUTADOS)) %>%  
+  arrange(desc(n)) -> mi_data_count
+
+# Asignamos colores a los partidos
+mi_data_count %<>%
+  mutate(party_color = case_when(
+    party_groups == "MORENA" ~ "#9E1B32",
+    party_groups == "PAN" ~ "#1E88E5",
+    party_groups == "PRI" ~ "#004D2C",
+    party_groups == "PT" ~ "#D32F2F",
+    party_groups == "MC" ~ "#FF9800",
+    party_groups == "PV" ~ "#4CAF50",
+    party_groups == "SP" ~ "#757575"
+  ))
+
+# Creamos una nueva columna para la leyenda con los nombres de los partidos y los diputados entre paréntesis
+mi_data_count <- mi_data_count %>%
+  mutate(legend_label = paste(party_groups, "(", n, " diputados)", sep = ""))
+
+# Preparar los datos para el gráfico (escalado para gráfico semicircular)
+mi_data_coord <- parliament_data(
+  election_data = mi_data_count,
+  type = "semicircle",
+  parl_rows = 10,  # Número de escaños por columna
+  party_seats = mi_data_count$n
+)
+
+# Crear el gráfico
+mi_data_plot <- mi_data_coord %>%
+  ggplot(aes(x = x, y = y, colour = party_groups)) +
+  geom_parliament_seats(size = 3) +  # Tamaño de las bolas
+  ggtitle("Cámara de Diputados México (2024-2027)") +
+  coord_fixed() +  # Mantener la proporción correcta
+  theme_void() +   # Eliminamos ejes, texto y fondos no deseados
+  theme(
+    text = element_text(size = 11), # Ajustar tamaño del texto
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.3, size = 20), # Centrar título
+    plot.margin = margin(1, 1, 1, 1, "cm") # Márgenes
+  ) +
+  scale_colour_manual(
+    values = mi_data_count$party_color,
+    limits = mi_data_count$party_groups,
+    labels = mi_data_count$legend_label  # Aquí agregamos los nombres de los partidos con la cantidad de diputados
+  ) +
+  guides(colour = guide_legend(title = "Partidos"))  # Título de la leyenda
+
+print(mi_data_plot)
+```
+
+## Paso 3: Guardamos el gráfico
+
+```{r}
+ggsave("grafico_2024.png", plot = mi_data_plot, width = 10, height = 7, dpi = 300)
+```
+
